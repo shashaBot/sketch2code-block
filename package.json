@@ -1,0 +1,22 @@
+{
+    "dependencies": {
+        "@airtable/blocks": "0.0.52",
+        "@craftjs/core": "^0.1.0-beta.7",
+        "axios": "^0.19.2",
+        "canvas-sketch": "^0.7.3",
+        "jsdom": "^16.2.2",
+        "qrcode.react": "^1.0.0",
+        "react": "^16.9.0",
+        "react-dom": "^16.9.0",
+        "react-sketch": "^0.5.1",
+        "react-sketch-canvas": "^5.0.1"
+    },
+    "devDependencies": {
+        "eslint": "^6.3.0",
+        "eslint-plugin-react": "^7.14.3",
+        "eslint-plugin-react-hooks": "^2.0.1"
+    },
+    "scripts": {
+        "lint": "eslint frontend"
+    }
+}
