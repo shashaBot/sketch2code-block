@@ -11,6 +11,8 @@ The user can create and edit sketches without leaving their collaboration space 
 2. Create a new custom block in your new base (see
    [Create a new block](https://airtable.com/developers/blocks/guides/hello-world-tutorial#create-a-new-block)), select GitHub template and provide URL of this repository.
 
-3. Set up your Sketch2Code API and Blob Storage following the docs [here](https://github.com/microsoft/ailab/blob/master/Sketch2Code/README.md)
+3. (Optional) Set up your Sketch2Code API and Blob Storage following the docs [here](https://github.com/microsoft/ailab/blob/master/Sketch2Code/README.md)
 
 4. From the root of your new block, run `block run`.
+
+5. Optionally, you can provide your custom trained API and Blob storage URL (created in step 3 above) during configuration of the block.
