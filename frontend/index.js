@@ -11,7 +11,6 @@ import {
   useSettingsButton,
   useWatchable,
   Box,
-  Button,
   Dialog,
   Heading,
   Link,
@@ -105,6 +104,7 @@ function Sketch2CodeBlock() {
   // it unnecessarily.
   const onRecordAction = useCallback(
     (data) => {
+      console.log("record action: ", data);
       // Ignore the event if settings are already open.
       // This means we can assume settings are valid (since we force settings to be open if
       // they are invalid).
@@ -175,7 +175,7 @@ function Sketch2CodeBlock() {
       {recordActionErrorMessage && (
         <Dialog onClose={() => setRecordActionErrorMessage("")} maxWidth={400}>
           <Dialog.CloseButton />
-          <Heading size="small">Can&apos;t preview URL</Heading>
+          <Heading size="small">Configuration required</Heading>
           <Text variant="paragraph" marginBottom={0}>
             {recordActionErrorMessage}
           </Text>
@@ -193,18 +193,19 @@ function RecordPreviewWithDialog({
   selectedFieldId,
   setIsSettingsOpen,
 }) {
+  const {
+    settings: { isCustomApi, customApiUrl, customBlobStore, restrictMode },
+  } = useSettings();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [mode, setMode] = useState("sketch");
+  const [mode, setMode] = useState(() =>
+    restrictMode !== "both" ? restrictMode : "sketch"
+  );
 
   // Close the dialog when the selected record is changed.
   // The new record might have a preview, so we don't want to hide it behind this dialog.
   useEffect(() => {
     setIsDialogOpen(false);
   }, [selectedRecordId]);
-
-  const {
-    settings: { isCustomApi, customApiUrl, customBlobStore },
-  } = useSettings();
 
   let BlobStoreURL = "https://s2cblob.shashwat.workers.dev";
   if (isCustomApi) {
@@ -245,15 +246,17 @@ function RecordPreviewWithDialog({
         justifyContent="center"
         flexDirection="column"
       >
-        <SelectButtons
-          value={mode}
-          onChange={setMode}
-          options={[
-            { value: "sketch", label: "Sketch" },
-            { value: "code", label: "Code" },
-          ]}
-          width="100%"
-        />
+        {restrictMode === "both" && (
+          <SelectButtons
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: "sketch", label: "Sketch" },
+              { value: "code", label: "Code" },
+            ]}
+            width="100%"
+          />
+        )}
 
         {mode === "sketch" && (
           <Canvas
@@ -262,6 +265,7 @@ function RecordPreviewWithDialog({
             selectedFieldId={selectedFieldId}
             s2cGetOriginal={s2cGetOriginal}
             s2cSaveFile={s2cSaveFile}
+            restrictMode={restrictMode}
           />
         )}
 
@@ -311,7 +315,7 @@ function RecordPreview({
   s2cApiUrl,
 }) {
   const {
-    settings: { isEnforced, urlField, urlTable, prototypeUrlField },
+    settings: { isEnforced, urlField, urlTable },
   } = useSettings();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -349,43 +353,42 @@ function RecordPreview({
         setError(
           "Please select an attachment field with your UI sketch(es) to see the output."
         );
-        return;
-      }
-      const cellValue = selectedRecord.getCellValue(previewField);
-      const updateHtmlPages = {};
-      if (!cellValue) {
-        setError(
-          "There are no attachments. Add a sketch to see its prototype here."
-        );
-        return;
-      }
-      const attachmentObj = cellValue.find(
-        (value) => value.url.match(/\.(jpeg|jpg|gif|png)$/) !== null
-      );
-      if (!attachmentObj) {
-        setError(
-          "No image attachments found. Please include an image attachment in the field."
-        );
-        return;
-      }
-      const clientUrl = selectedRecord.getAttachmentClientUrlFromCellValueUrl(
-        attachmentObj.id,
-        attachmentObj.url
-      );
-      console.log(attachmentObj.url);
-      if (!(attachmentObj.id in htmlPages)) {
-        const { id: attachmentId } = attachmentObj;
-        setLoading(true);
-        getHtmlCodeFromSketch(clientUrl, s2cApiUrl).then(
-          ([newPage, correlationId]) => {
-            updateHtmlPages[attachmentId] = {
-              html: newPage,
-              s2cFolderId: correlationId,
-            };
-            setHtmlPages(updateHtmlPages);
-            setLoading(false);
+      } else {
+        const cellValue = selectedRecord.getCellValue(previewField);
+        const updateHtmlPages = {};
+        if (!cellValue) {
+          setError(
+            "There are no attachments. Add a sketch to see its prototype here."
+          );
+        } else {
+          const attachmentObj = cellValue.find(
+            (value) => value.url.match(/\.(jpeg|jpg|gif|png)$/) !== null
+          );
+          if (!attachmentObj) {
+            setError(
+              "No image attachments found. Please include an image attachment in the field."
+            );
+          } else {
+            const clientUrl = selectedRecord.getAttachmentClientUrlFromCellValueUrl(
+              attachmentObj.id,
+              attachmentObj.url
+            );
+            if (!(attachmentObj.id in htmlPages)) {
+              const { id: attachmentId } = attachmentObj;
+              setLoading(true);
+              getHtmlCodeFromSketch(clientUrl, s2cApiUrl).then(
+                ([newPage, correlationId]) => {
+                  updateHtmlPages[attachmentId] = {
+                    html: newPage,
+                    s2cFolderId: correlationId,
+                  };
+                  setHtmlPages(updateHtmlPages);
+                  setLoading(false);
+                }
+              );
+            }
           }
-        );
+        }
       }
     }
   }, [selectedRecord, htmlPages, previewField, s2cApiUrl]);

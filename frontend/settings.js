@@ -9,15 +9,10 @@ export const ConfigKeys = {
   CUSTOM_WEB_API: "customApiUrl",
   CUSTOM_BLOB_STORE: "customBlobStore",
   PROTOTYPE_URL_FIELD: "prototypeUrlField",
+  RESTRICT_MODE: "restrictMode",
 };
 
-export const allowedUrlFieldTypes = [
-  // FieldType.FORMULA,
-  // FieldType.SINGLE_LINE_TEXT,
-  // FieldType.MULTILINE_TEXT,
-  // FieldType.URL,
-  FieldType.MULTIPLE_ATTACHMENTS,
-];
+export const allowedUrlFieldTypes = [FieldType.MULTIPLE_ATTACHMENTS];
 
 export const allowedPrototypeUrlFieldTypes = [FieldType.URL, FieldType.BARCODE];
 
@@ -31,7 +26,9 @@ export const allowedPrototypeUrlFieldTypes = [FieldType.URL, FieldType.BARCODE];
  *     urlField: Field | null,
  *     isCustomApi: true | false,
  *     customApiUrl: string,
- *     customBlobStore: string
+ *     customBlobStore: string,
+ *     prototypeUrlField: string,
+ *     restrictMode: string,
  * }}
  */
 function getSettings(globalConfig, base) {
@@ -42,6 +39,7 @@ function getSettings(globalConfig, base) {
   const customApiUrl = globalConfig.get(ConfigKeys.CUSTOM_WEB_API) || "";
   const customBlobStore = globalConfig.get(ConfigKeys.CUSTOM_BLOB_STORE) || "";
   const prototypeUrlFieldId = globalConfig.get(ConfigKeys.PROTOTYPE_URL_FIELD);
+  const restrictMode = globalConfig.get(ConfigKeys.RESTRICT_MODE) || "both";
 
   const urlTable = base.getTableByIdIfExists(urlTableId);
   const urlField = urlTable ? urlTable.getFieldByIdIfExists(urlFieldId) : null;
@@ -57,6 +55,7 @@ function getSettings(globalConfig, base) {
     customApiUrl,
     customBlobStore,
     prototypeUrlField,
+    restrictMode,
   };
 }
 

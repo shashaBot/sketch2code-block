@@ -1,10 +1,23 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Box, Button, Text, Dialog, Heading, Input } from "@airtable/blocks/ui";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import {
+  Box,
+  Button,
+  Text,
+  Dialog,
+  Heading,
+  Input,
+  useWatchable,
+  registerRecordActionDataCallback
+} from "@airtable/blocks/ui";
+
+import { cursor } from "@airtable/blocks";
+
 import { SketchField, Tools } from "react-sketch";
 import { FieldType } from "@airtable/blocks/models";
 import { useRecordById } from "@airtable/blocks/ui";
 import axios from "axios";
-import queryString from "querystring";
+
+import { useSettings } from "./settings";
 
 const ToolButton = (props) => {
   return <Button width="90px" marginBottom="4px" {...props} />;
@@ -37,7 +50,7 @@ const ToolSet = ({
     addText(textValue);
     setTextValue("");
     setIsDialogOpen(false);
-    onSelect(Tools.Select)
+    onSelect(Tools.Select);
   };
 
   return (
@@ -72,11 +85,17 @@ const ToolSet = ({
           <Button onClick={createText}>Add</Button>
         </Dialog>
       )}
+      <ToolButton disabled={!canUndo} key="undo" onClick={undo}>
+        Undo
+      </ToolButton>
+      <ToolButton disabled={!canRedo} key="redo" onClick={redo}>
+        Redo
+      </ToolButton>
       <ToolButton key="clear" onClick={clear}>
         Clear
       </ToolButton>
       <ToolButton key="load" disabled={!canLoad} onClick={load}>
-        {isLoading? "Loading" : "Load"}
+        {isLoading ? "Loading" : "Load"}
       </ToolButton>
       <ToolButton
         variant="primary"
@@ -84,7 +103,7 @@ const ToolSet = ({
         disabled={!canSave}
         onClick={save}
       >
-        {isSaving ? "Saving": "Save"}
+        {isSaving ? "Saving" : "Save"}
       </ToolButton>
     </>
   );
@@ -96,6 +115,7 @@ const Canvas = ({
   selectedFieldId,
   s2cSaveFile,
   s2cGetOriginal,
+  restrictMode
 }) => {
   const [tool, setTool] = useState(Tools.Pencil);
   const [sketchValue, setSketchValue] = useState(null);
@@ -107,17 +127,56 @@ const Canvas = ({
   const [canLoad, setCanLoad] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [backgroundColor, setBackgroundColor] = useState("#ffffff");
 
   const sketchRef = useRef(null);
-  const selectedField = activeTable.getFieldByIdIfExists(selectedFieldId);
 
+  const {
+    settings: { isEnforced, urlField, urlTable },
+  } = useSettings();
+
+  const table = (isEnforced && urlTable) || activeTable;
+
+  // We use getFieldByIdIfExists because the field might be deleted.
+  const selectedField = selectedFieldId
+    ? table.getFieldByIdIfExists(selectedFieldId)
+    : null;
+  // When using a specific field for previews is enabled and that field exists,
+  // use the selectedField
+  const previewField = (isEnforced && urlField) || selectedField;
+  // Triggers a re-render if the record changes. Preview URL cell value
+  // might have changed, or record might have been deleted.
   const selectedRecord = useRecordById(
-    activeTable,
+    table,
     selectedRecordId ? selectedRecordId : "",
     {
-      fields: [selectedField],
+      fields: [previewField],
     }
   );
+
+  useEffect( () => {
+    if (restrictMode === "sketch" && previewField === urlField && selectedRecord) {
+      load()
+    }
+  }, [restrictMode, load, previewField, urlField, selectedRecord])
+
+  // Triggers a re-render if the user switches table or view.
+  // RecordPreview may now need to render a preview, or render nothing at all.
+  useWatchable(cursor, ["activeTableId", "activeViewId"]);
+
+  // Remove error when the selected record changes.
+  useEffect(() => {
+    setError("");
+  }, [selectedRecord]);
+
+  // const onRecordAction = useCallback( (data) => {
+  // })
+
+  // useEffect(() => {
+  //   // Return the unsubscribe function to ensure we clean up the handler.
+  //   return registerRecordActionDataCallback(onRecordAction);
+  // }, [onRecordAction]);
 
   const addText = (text) => {
     sketchRef.current.addText(text);
@@ -134,6 +193,7 @@ const Canvas = ({
   const clear = () => {
     sketchRef.current.clear();
     setSketchValue(null);
+    setBackgroundColor("#ffffff");
     setCanUndo(sketchRef.current.canUndo());
     setCanRedo(sketchRef.current.canRedo());
   };
@@ -178,7 +238,7 @@ const Canvas = ({
     const {
       data: { folderId: jsonFolderId },
     } = await s2cSaveFile("blah," + encodedSketch);
-    console.log(s2cGetOriginal(jsonFolderId, { "content-type": "text/html" }));
+    console.log(s2cGetOriginal(jsonFolderId, { "content-type": "text/json" }));
     try {
       await activeTable.updateRecordsAsync([
         {
@@ -191,7 +251,7 @@ const Canvas = ({
               },
               {
                 url: s2cGetOriginal(jsonFolderId, {
-                  "content-type": "text/html",
+                  "content-type": "text/json",
                 }),
                 filename: "sketch.json",
               },
@@ -206,20 +266,26 @@ const Canvas = ({
     }
   };
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setIsLoading(true);
-    const cellValue = selectedRecord.getCellValue(selectedField);
+    const cellValue = selectedRecord.getCellValue(previewField);
     const [sketchAttachment] = cellValue.filter(
       (attachmentObj) => attachmentObj.filename === "sketch.json"
     );
+    if (!sketchAttachment) {
+      setError(
+        "Could't load sketch. 'sketch.json' was not found in the attachments of the selected record."
+      );
+    }
     const sketchUrl = selectedRecord.getAttachmentClientUrlFromCellValueUrl(
       sketchAttachment.id,
       sketchAttachment.url
     );
     const { data: sketchJSON } = await axios.get(sketchUrl);
     setSketchValue(sketchJSON);
+    onToolSelect(Tools.Select);
     setIsLoading(false);
-  };
+  }, [selectedRecord, selectedField]);
 
   // canSave and canLoad
   useEffect(() => {
@@ -304,7 +370,7 @@ const Canvas = ({
           lineColor="black"
           lineWidth={3}
           ref={sketchRef}
-          backgroundColor="#ffffff"
+          backgroundColor={backgroundColor}
           value={sketchValue}
           onChange={onSketchChange}
         />
@@ -346,6 +412,15 @@ const Canvas = ({
           </Text>
         )}
       </Box>
+      {error && (
+        <Dialog onClose={() => setError("")} maxWidth={400}>
+          <Dialog.CloseButton />
+          <Heading size="small">Something went wrong</Heading>
+          <Text variant="paragraph" marginBottom={0}>
+            {error}
+          </Text>
+        </Dialog>
+      )}
     </Box>
   );
 };
