@@ -126,26 +126,24 @@ function SettingsForm({ setIsSettingsOpen }) {
           </FormField>
         )}
         {isEnforced && urlTable && (
-          <>
-            <FormField label="Sketches field">
-              <FieldPickerSynced
-                table={urlTable}
-                globalConfigKey={ConfigKeys.URL_FIELD_ID}
-                allowedTypes={allowedUrlFieldTypes}
-              />
-            </FormField>
-            <FormField label="Prototype URLs field">
-              <FieldPickerSynced
-                table={urlTable}
-                globalConfigKey={ConfigKeys.PROTOTYPE_URL_FIELD}
-                allowedTypes={allowedPrototypeUrlFieldTypes}
-              />
-              <Text paddingY={1} textColor="light">
-                Choose a field for storing prototype URLs
-              </Text>
-            </FormField>
-          </>
+          <FormField label="Sketches field">
+            <FieldPickerSynced
+              table={urlTable}
+              globalConfigKey={ConfigKeys.URL_FIELD_ID}
+              allowedTypes={allowedUrlFieldTypes}
+            />
+          </FormField>
         )}
+        <FormField label="Prototype URLs field">
+          <FieldPickerSynced
+            table={urlTable}
+            globalConfigKey={ConfigKeys.PROTOTYPE_URL_FIELD}
+            allowedTypes={allowedPrototypeUrlFieldTypes}
+          />
+          <Text paddingY={1} textColor="light">
+            Choose a field for storing prototype URLs
+          </Text>
+        </FormField>
       </Box>
       <Box display="flex" flex="none" padding={3} borderTop="thick">
         <Box

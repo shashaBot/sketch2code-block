@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Box, Button, Text } from "@airtable/blocks/ui";
+import { Box, Button, Text, Dialog, Heading, Input } from "@airtable/blocks/ui";
 import { SketchField, Tools } from "react-sketch";
 import { FieldType } from "@airtable/blocks/models";
 import { useRecordById } from "@airtable/blocks/ui";
@@ -23,7 +23,23 @@ const ToolSet = ({
   canSave,
   load,
   canLoad,
+  isSaving,
+  isLoading,
+  canUndo,
+  undo,
+  canRedo,
+  redo,
 }) => {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [textValue, setTextValue] = useState("");
+
+  const createText = () => {
+    addText(textValue);
+    setTextValue("");
+    setIsDialogOpen(false);
+    onSelect(Tools.Select)
+  };
+
   return (
     <>
       {enableCopyPaste && <ToolButton onClick={copy}>Copy</ToolButton>}
@@ -41,14 +57,26 @@ const ToolSet = ({
           {toolKey}
         </ToolButton>
       ))}
-      <ToolButton key="text" onClick={addText}>
+      <ToolButton key="text" onClick={() => setIsDialogOpen(true)}>
         Text
       </ToolButton>
+      {isDialogOpen && (
+        <Dialog onClose={() => setIsDialogOpen(false)} width="320px">
+          <Dialog.CloseButton />
+          <Heading>Add Text</Heading>
+          <Input
+            value={textValue}
+            onChange={(e) => setTextValue(e.target.value)}
+            marginBottom={2}
+          />
+          <Button onClick={createText}>Add</Button>
+        </Dialog>
+      )}
       <ToolButton key="clear" onClick={clear}>
         Clear
       </ToolButton>
       <ToolButton key="load" disabled={!canLoad} onClick={load}>
-        Load
+        {isLoading? "Loading" : "Load"}
       </ToolButton>
       <ToolButton
         variant="primary"
@@ -56,7 +84,7 @@ const ToolSet = ({
         disabled={!canSave}
         onClick={save}
       >
-        Save
+        {isSaving ? "Saving": "Save"}
       </ToolButton>
     </>
   );
@@ -79,6 +107,7 @@ const Canvas = ({
   const [canLoad, setCanLoad] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
   const sketchRef = useRef(null);
   const selectedField = activeTable.getFieldByIdIfExists(selectedFieldId);
 
@@ -90,8 +119,8 @@ const Canvas = ({
     }
   );
 
-  const addText = () => {
-    sketchRef.current.addText("Sample Text");
+  const addText = (text) => {
+    sketchRef.current.addText(text);
   };
 
   const onSketchChange = () => {
@@ -137,24 +166,19 @@ const Canvas = ({
     setEnableRemoveSelected(isSelectTool);
   };
 
-  const updateSketch = () => {
-    console.save(
-      JSON.stringify(sketchRef.current.toJSON()),
-      "sketch-edit.json"
-    );
-  };
-
   const save = async () => {
     setIsSaving(true);
     const {
       data: { folderId: imageFolderId },
     } = await s2cSaveFile(sketchRef.current.toDataURL());
 
+    setSketchValue(sketchRef.current.toJSON());
+
     const encodedSketch = btoa(JSON.stringify(sketchRef.current.toJSON()));
     const {
       data: { folderId: jsonFolderId },
     } = await s2cSaveFile("blah," + encodedSketch);
-    console.log(s2cGetOriginal(jsonFolderId, { 'content-type': 'text/html'}))
+    console.log(s2cGetOriginal(jsonFolderId, { "content-type": "text/html" }));
     try {
       await activeTable.updateRecordsAsync([
         {
@@ -166,7 +190,9 @@ const Canvas = ({
                 filename: "sketch.png",
               },
               {
-                url: s2cGetOriginal(jsonFolderId, { 'content-type': 'text/html'}),
+                url: s2cGetOriginal(jsonFolderId, {
+                  "content-type": "text/html",
+                }),
                 filename: "sketch.json",
               },
             ],
@@ -182,7 +208,6 @@ const Canvas = ({
 
   const load = async () => {
     setIsLoading(true);
-
     const cellValue = selectedRecord.getCellValue(selectedField);
     const [sketchAttachment] = cellValue.filter(
       (attachmentObj) => attachmentObj.filename === "sketch.json"
@@ -191,13 +216,12 @@ const Canvas = ({
       sketchAttachment.id,
       sketchAttachment.url
     );
-    console.log(sketchUrl)
     const { data: sketchJSON } = await axios.get(sketchUrl);
-    console.log(sketchJSON);
     setSketchValue(sketchJSON);
     setIsLoading(false);
   };
 
+  // canSave and canLoad
   useEffect(() => {
     if (
       activeTable &&
@@ -282,7 +306,6 @@ const Canvas = ({
           ref={sketchRef}
           backgroundColor="#ffffff"
           value={sketchValue}
-          forceValue
           onChange={onSketchChange}
         />
       </Box>
@@ -302,6 +325,8 @@ const Canvas = ({
           load={load}
           canSave={canSave}
           canLoad={canLoad}
+          isLoading={isLoading}
+          isSaving={isSaving}
           clear={clear}
           canUndo={canUndo}
           canRedo={canRedo}
@@ -314,7 +339,7 @@ const Canvas = ({
         />
       </Box>
       <Box marginTop="10px">
-        {!canSave && (
+        {!canSave && !isSaving && (
           <Text>
             Select an attachment field and then click on Save to store your
             sketch.

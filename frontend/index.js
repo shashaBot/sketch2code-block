@@ -308,10 +308,10 @@ function RecordPreview({
   selectedRecordId,
   selectedFieldId,
   setIsSettingsOpen,
-  s2cApiUrl
+  s2cApiUrl,
 }) {
   const {
-    settings: { isEnforced, urlField, urlTable },
+    settings: { isEnforced, urlField, urlTable, prototypeUrlField },
   } = useSettings();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -359,28 +359,36 @@ function RecordPreview({
         );
         return;
       }
-      cellValue.map((attachmentObj) => {
-        const clientUrl = selectedRecord.getAttachmentClientUrlFromCellValueUrl(
-          attachmentObj.id,
-          attachmentObj.url
+      const attachmentObj = cellValue.find(
+        (value) => value.url.match(/\.(jpeg|jpg|gif|png)$/) !== null
+      );
+      if (!attachmentObj) {
+        setError(
+          "No image attachments found. Please include an image attachment in the field."
         );
-        if (!(attachmentObj.id in htmlPages)) {
-          const { id: attachmentId } = attachmentObj;
-          setLoading(true);
-          getHtmlCodeFromSketch(clientUrl, s2cApiUrl).then(
-            ([newPage, correlationId]) => {
-              updateHtmlPages[attachmentId] = {
-                html: newPage,
-                s2cFolderId: correlationId,
-              };
-              setHtmlPages(updateHtmlPages);
-              setLoading(false);
-            }
-          );
-        }
-      });
+        return;
+      }
+      const clientUrl = selectedRecord.getAttachmentClientUrlFromCellValueUrl(
+        attachmentObj.id,
+        attachmentObj.url
+      );
+      console.log(attachmentObj.url);
+      if (!(attachmentObj.id in htmlPages)) {
+        const { id: attachmentId } = attachmentObj;
+        setLoading(true);
+        getHtmlCodeFromSketch(clientUrl, s2cApiUrl).then(
+          ([newPage, correlationId]) => {
+            updateHtmlPages[attachmentId] = {
+              html: newPage,
+              s2cFolderId: correlationId,
+            };
+            setHtmlPages(updateHtmlPages);
+            setLoading(false);
+          }
+        );
+      }
     }
-  }, [selectedRecord, htmlPages, previewField]);
+  }, [selectedRecord, htmlPages, previewField, s2cApiUrl]);
 
   if (
     // If there is/was a specified table enforced, but the cursor
@@ -428,9 +436,20 @@ function RecordPreview({
     );
   } else if (error) {
     return (
-      <Fragment>
-        <Text style={{ marginTop: "30%" }}>{error}</Text>
-      </Fragment>
+      <Box
+        position="absolute"
+        top={0}
+        bottom={0}
+        left={0}
+        right={0}
+        flexDirection="column"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        textAlign="center"
+      >
+        <Text>{error}</Text>
+      </Box>
     );
   } else if (loading) {
     return (
@@ -452,63 +471,65 @@ function RecordPreview({
     return (
       <Fragment>
         <div
+          style={{ marginBottom: "20px" }}
           dangerouslySetInnerHTML={{
             __html:
               htmlPages[Object.keys(htmlPages)[0]] &&
               htmlPages[Object.keys(htmlPages)[0]].html,
           }}
         ></div>
-        <Link
-          style={{ position: "fixed", bottom: "10px", right: "10px" }}
-          target="_blank"
-          href={
-            htmlPages[Object.keys(htmlPages)[0]] &&
-            `${s2cApiUrl}/layout/result/${
-              htmlPages[Object.keys(htmlPages)[0]].s2cFolderId
-            }`
-          }
-          icon="download"
-        >
-          Download
-        </Link>
-        <TextButton
-          style={{ position: "fixed", bottom: "10px", left: "10px" }}
-          onClick={() => setIsDialogOpen(true)}
-          variant="light"
-          icon="hyperlink"
-        >
-          Device Preview
-        </TextButton>
-
-        {isDialogOpen && (
-          <Dialog
-            onClose={() => setIsDialogOpen(false)}
-            maxWidth={400}
-            textAlign="center"
-          >
-            <Dialog.CloseButton />
-            <Heading size="small">Test prototype on your device</Heading>
-            <Text marginTop={2}>
-              Get full preview using the link or scan QR Code
-            </Text>
-            <Text marginTop={2} marginBottom={4}>
-              <Link
-                href={`${s2cApiUrl}/layout/result/${
-                  htmlPages[Object.keys(htmlPages)[0]].s2cFolderId
-                }?download=false`}
-                target="_blank"
-              >
-                Full page preview
-              </Link>
-            </Text>
-
-            <QRCode
-              style={{ display: "block", margin: "auto" }}
-              value={`${s2cApiUrl}/layout/result/${
+        {htmlPages[Object.keys(htmlPages)[0]] && (
+          <>
+            <Link
+              style={{ position: "fixed", bottom: "10px", right: "10px" }}
+              target="_blank"
+              href={`${s2cApiUrl}/layout/result/${
                 htmlPages[Object.keys(htmlPages)[0]].s2cFolderId
-              }?download=false`}
-            />
-          </Dialog>
+              }`}
+              icon="download"
+            >
+              Download
+            </Link>
+            <TextButton
+              style={{ position: "fixed", bottom: "10px", left: "10px" }}
+              onClick={() => setIsDialogOpen(true)}
+              variant="light"
+              icon="hyperlink"
+            >
+              Device Preview
+            </TextButton>
+
+            {isDialogOpen && (
+              <Dialog
+                onClose={() => setIsDialogOpen(false)}
+                maxWidth={400}
+                textAlign="center"
+              >
+                <Dialog.CloseButton />
+                <Heading size="small">Test prototype on your device</Heading>
+                <Text marginTop={2}>
+                  Get full preview using the link or scan QR Code
+                </Text>
+                <Text marginTop={2} marginBottom={4}>
+                  <Link
+                    href={`${s2cApiUrl}/layout/result/${
+                      htmlPages[Object.keys(htmlPages)[0]].s2cFolderId
+                    }?download=false`}
+                    target="_blank"
+                  >
+                    Full page preview
+                  </Link>
+                </Text>
+
+                <QRCode
+                  style={{ display: "block", margin: "auto" }}
+                  value={`${s2cApiUrl}/layout/result/${
+                    htmlPages[Object.keys(htmlPages)[0]].s2cFolderId
+                  }?download=false`}
+                />
+              </Dialog>
+            )}
+          </>
         )}
       </Fragment>
     );
