@@ -315,7 +315,7 @@ function RecordPreview({
   s2cApiUrl,
 }) {
   const {
-    settings: { isEnforced, urlField, urlTable },
+    settings: { isEnforced, urlField, urlTable, prototypeUrlField },
   } = useSettings();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -393,6 +393,19 @@ function RecordPreview({
     }
   }, [selectedRecord, htmlPages, previewField, s2cApiUrl]);
 
+  // useEffect(() => {
+  //   if (prototypeUrlField && Object.keys(htmlPages).length) {
+  //     activeTable.updateRecordsAsync([{
+  //       id: selectedRecordId,
+  //       fields: {
+  //         [prototypeUrlField.id]: `${s2cApiUrl}/layout/result/${
+  //           htmlPages[Object.keys(htmlPages)[0]].s2cFolderId
+  //         }`
+  //       }
+  //     }])
+  //     .catch( error => console.log(error))
+  //   }
+  // }, [prototypeUrlField, htmlPages, selectedRecordId, activeTable, s2cApiUrl])
   if (
     // If there is/was a specified table enforced, but the cursor
     // is not presently in the specified table, display a message to the user.

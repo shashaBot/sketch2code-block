@@ -7,7 +7,6 @@ import {
   Heading,
   Input,
   useWatchable,
-  registerRecordActionDataCallback
 } from "@airtable/blocks/ui";
 
 import { cursor } from "@airtable/blocks";
@@ -91,9 +90,9 @@ const ToolSet = ({
       <ToolButton disabled={!canRedo} key="redo" onClick={redo}>
         Redo
       </ToolButton>
-      <ToolButton key="clear" onClick={clear}>
+      {/* <ToolButton key="clear" onClick={clear}>
         Clear
-      </ToolButton>
+      </ToolButton> */}
       <ToolButton key="load" disabled={!canLoad} onClick={load}>
         {isLoading ? "Loading" : "Load"}
       </ToolButton>
@@ -115,7 +114,7 @@ const Canvas = ({
   selectedFieldId,
   s2cSaveFile,
   s2cGetOriginal,
-  restrictMode
+  restrictMode,
 }) => {
   const [tool, setTool] = useState(Tools.Pencil);
   const [sketchValue, setSketchValue] = useState(null);
@@ -155,15 +154,19 @@ const Canvas = ({
     }
   );
 
-  useEffect( () => {
-    if (restrictMode === "sketch" && previewField === urlField && selectedRecord) {
-      load()
+  useEffect(() => {
+    if (
+      restrictMode === "sketch" &&
+      previewField === urlField &&
+      selectedRecord
+    ) {
+      load();
     }
-  }, [restrictMode, load, previewField, urlField, selectedRecord])
+  }, [restrictMode, load, previewField, urlField, selectedRecord]);
 
   // Triggers a re-render if the user switches table or view.
   // RecordPreview may now need to render a preview, or render nothing at all.
-  useWatchable(cursor, ["activeTableId", "activeViewId"]);
+  // useWatchable(cursor, ["activeTableId", "activeViewId"]);
 
   // Remove error when the selected record changes.
   useEffect(() => {
@@ -269,23 +272,31 @@ const Canvas = ({
   const load = useCallback(async () => {
     setIsLoading(true);
     const cellValue = selectedRecord.getCellValue(previewField);
-    const [sketchAttachment] = cellValue.filter(
-      (attachmentObj) => attachmentObj.filename === "sketch.json"
-    );
-    if (!sketchAttachment) {
+    if (!cellValue) {
       setError(
-        "Could't load sketch. 'sketch.json' was not found in the attachments of the selected record."
+        "No sketch found in this record. Please create a sketch and 'Save' it."
       );
     }
-    const sketchUrl = selectedRecord.getAttachmentClientUrlFromCellValueUrl(
-      sketchAttachment.id,
-      sketchAttachment.url
-    );
-    const { data: sketchJSON } = await axios.get(sketchUrl);
-    setSketchValue(sketchJSON);
-    onToolSelect(Tools.Select);
-    setIsLoading(false);
-  }, [selectedRecord, selectedField]);
+    else {
+      const [sketchAttachment] = cellValue.filter(
+        (attachmentObj) => attachmentObj.filename === "sketch.json"
+      );
+      if (!sketchAttachment) {
+        setError(
+          "Could't load sketch. 'sketch.json' was not found in the attachments of the selected record. Please make sure to save the sketch using sketch editor in the desired record."
+        );
+      } else {
+        const sketchUrl = selectedRecord.getAttachmentClientUrlFromCellValueUrl(
+          sketchAttachment.id,
+          sketchAttachment.url
+        );
+        const { data: sketchJSON } = await axios.get(sketchUrl);
+        setSketchValue(sketchJSON);
+        onToolSelect(Tools.Select);
+      }
+    }
+    setIsLoading(false);    
+  }, [selectedRecord, previewField]);
 
   // canSave and canLoad
   useEffect(() => {
@@ -313,46 +324,6 @@ const Canvas = ({
     selectedField,
     isLoading,
   ]);
-
-  // create console.save function for storing the sketch json.
-  useEffect(() => {
-    (function (console) {
-      console.save = function (data, filename) {
-        if (!data) {
-          console.error("Console.save: No data");
-          return;
-        }
-        if (!filename) filename = "console.json";
-        if (typeof data === "object") {
-          data = JSON.stringify(data, undefined, 4);
-        }
-        var blob = new Blob([data], { type: "text/json" }),
-          e = document.createEvent("MouseEvents"),
-          a = document.createElement("a");
-        a.download = filename;
-        a.href = window.URL.createObjectURL(blob);
-        a.dataset.downloadurl = ["text/json", a.download, a.href].join(":");
-        e.initMouseEvent(
-          "click",
-          true,
-          false,
-          window,
-          0,
-          0,
-          0,
-          0,
-          0,
-          false,
-          false,
-          false,
-          false,
-          0,
-          null
-        );
-        a.dispatchEvent(e);
-      };
-    })(console);
-  }, []);
 
   return (
     <Box
